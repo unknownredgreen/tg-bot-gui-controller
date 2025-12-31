@@ -85,6 +85,9 @@ public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
     }
 
     private void createLowestComponents() {
+        String placeholder = "Message id to reply";
+
+
         clearAfterSendingCB = new JCheckBox("Clear after sending", true);
         JPanel checkboxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         checkboxPanel.add(clearAfterSendingCB);
@@ -108,23 +111,38 @@ public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
         JButton replyToMessageButton = new JButton("Reply to message");
         replyToMessageButton.addActionListener(e -> {
             Integer messageToReply = null;
+            String messageToReplyString = messageToReplyIdInput.getText();
+
+            if (messageToReplyString.isEmpty() || messageToReplyString.equals(placeholder)) {
+                outputTextArea.setText("Tried replying but there was no message id where to reply");
+                return;
+            }
+
             try {
-                messageToReply = Integer.valueOf(messageToReplyIdInput.getText());
-            } catch (NumberFormatException ignored) {outputTextArea.setText("Message reply id has wrong number format");}
+                messageToReply = Integer.valueOf(messageToReplyString);
+            } catch (NumberFormatException ignored) {
+                outputTextArea.setText("Message reply id has wrong number format");
+            }
+
             String result = null;
             if (messageToReply != null) result = bot.sendMessage(textArea.getText(), chatId, messageToReply);
+
             if (result != null) {
                 outputTextArea.setText(result);
             } else {
-                outputTextArea.setText("Message sent");
-                if (clearAfterSendingCB.isSelected()) {
-                    textArea.setText("");
+                if (messageToReply == null) {
+                    outputTextArea.setText("Message id to reply is too big for Integer");
+                }
+                else {
+                    outputTextArea.setText("Message sent");
+                    if (clearAfterSendingCB.isSelected()) {
+                        textArea.setText("");
+                    }
                 }
             }
         });
 
         //Message id to reply input
-        String placeholder = "Message id to reply";
         messageToReplyIdInput = new JTextField(20);
 
         ((AbstractDocument) messageToReplyIdInput.getDocument()).setDocumentFilter(new DocumentFilter() {
