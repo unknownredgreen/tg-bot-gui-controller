@@ -66,8 +66,7 @@ public class Bot extends TelegramLongPollingBot {
             }
             return null;
         } catch (TelegramApiException e) {
-            log.error(e.getMessage());
-            return "Something went wrong.." + e.getClass().getSimpleName(); //TODO: make different exit messages for different tg exceptions
+            return e.getMessage();
         }
     }
 
