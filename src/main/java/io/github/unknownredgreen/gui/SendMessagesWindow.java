@@ -13,9 +13,18 @@ import java.util.Objects;
 public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
     private final long chatId;
     private final String chatTitle;
+
+    private JTextArea titleArea;
+
     private JTextArea textArea;
+    private JScrollPane scrollPane;
     private JScrollBar scrollBar;
-    private DefaultCaret textAreaCaret;
+
+    private JPanel bottomPanel;
+    private JTextArea outputTextArea;
+    private JCheckBox clearAfterSendingCB;
+    private JTextField messageToReplyIdInput;
+
 
     public SendMessagesWindow(long chatId, String chatTitle) {
         this.chatId = chatId;
@@ -25,29 +34,46 @@ public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
 
     @Override
     protected void onInitialization() {
-        //I`ll refactor this later but this version is working at least
-        JTextArea titleArea = new JTextArea();
+        createUpperComponents();
+        createCenterComponents();
+        createBottomComponents();
+        createLowestComponents();
+
+        SwingUtilities.invokeLater(() -> {
+            String cutChatTitle = Strings.cutString(chatTitle, 50);
+            titleArea.setText("%s\n(ID:%d)".formatted(cutChatTitle, chatId));
+
+            loadScrollState(scrollPane, chatId, storage);
+        });
+    }
+
+    private void createUpperComponents() {
+        titleArea = new JTextArea();
         titleArea.setEditable(false);
 
         add(titleArea, BorderLayout.NORTH);
+    }
 
+    private void createCenterComponents() {
         textArea = new JTextArea();
         textArea.setLineWrap(true);
         textArea.setWrapStyleWord(true);
-        textAreaCaret = (DefaultCaret) textArea.getCaret();
+        DefaultCaret textAreaCaret = (DefaultCaret) textArea.getCaret();
         textAreaCaret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
-        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane = new JScrollPane(textArea);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         scrollBar = scrollPane.getVerticalScrollBar();
 
         add(scrollPane, BorderLayout.CENTER);
+    }
 
-        JPanel bottomPanel = new JPanel();
+    private void createBottomComponents() {
+        bottomPanel = new JPanel();
         bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
 
-        JTextArea outputTextArea = new JTextArea(3, 40);
+        outputTextArea = new JTextArea(3, 40);
         outputTextArea.setLineWrap(true);
         outputTextArea.setEditable(false);
         outputTextArea.setWrapStyleWord(true);
@@ -55,11 +81,51 @@ public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
         JScrollPane lowerScroll = new JScrollPane(outputTextArea);
         bottomPanel.add(lowerScroll);
 
-        JCheckBox clearAfterSendingCB = new JCheckBox("Clear after sending", true);
+        add(bottomPanel, BorderLayout.SOUTH);
+    }
 
+    private void createLowestComponents() {
+        clearAfterSendingCB = new JCheckBox("Clear after sending", true);
+        JPanel checkboxPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        checkboxPanel.add(clearAfterSendingCB);
+        bottomPanel.add(checkboxPanel);
+
+        //Send button
+        JButton sendButton = new JButton("Send");
+        sendButton.addActionListener(e -> {
+            String result = bot.sendMessage(textArea.getText(), chatId);
+            if (result != null) {
+                outputTextArea.setText(result);
+            } else {
+                outputTextArea.setText("Message sent");
+                if (clearAfterSendingCB.isSelected()) {
+                    textArea.setText("");
+                }
+            }
+        });
+
+        //Reply to message button
+        JButton replyToMessageButton = new JButton("Reply to message");
+        replyToMessageButton.addActionListener(e -> {
+            Integer messageToReply = null;
+            try {
+                messageToReply = Integer.valueOf(messageToReplyIdInput.getText());
+            } catch (NumberFormatException ignored) {outputTextArea.setText("Message reply id has wrong number format");}
+            String result = null;
+            if (messageToReply != null) result = bot.sendMessage(textArea.getText(), chatId, messageToReply);
+            if (result != null) {
+                outputTextArea.setText(result);
+            } else {
+                outputTextArea.setText("Message sent");
+                if (clearAfterSendingCB.isSelected()) {
+                    textArea.setText("");
+                }
+            }
+        });
+
+        //Message id to reply input
         String placeholder = "Message id to reply";
-        JTextField messageToReplyIdInput = new JTextField(20);
-
+        messageToReplyIdInput = new JTextField(20);
 
         ((AbstractDocument) messageToReplyIdInput.getDocument()).setDocumentFilter(new DocumentFilter() {
 
@@ -98,56 +164,12 @@ public class SendMessagesWindow extends BasicWindow implements HasScrollPane {
                 }
             }
         });
-
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
-        JButton sendButton = new JButton("Send");
-        sendButton.addActionListener(e -> {
-            String result = bot.sendMessage(textArea.getText(), chatId);
-            if (result != null) {
-                outputTextArea.setText(result);
-            } else {
-                outputTextArea.setText("Message sent");
-                if (clearAfterSendingCB.isSelected()) {
-                    textArea.setText("");
-                }
-            }
-        });
-        JButton replyToMessageButton = new JButton("Reply to message");
-        replyToMessageButton.addActionListener(e -> {
-            Integer messageToReply = null;
-            try {
-                messageToReply = Integer.valueOf(messageToReplyIdInput.getText());
-            } catch (NumberFormatException ignored) {outputTextArea.setText("Message reply id has wrong number format");}
-            String result = null;
-            if (messageToReply != null) result = bot.sendMessage(textArea.getText(), chatId, messageToReply);
-            if (result != null) {
-                outputTextArea.setText(result);
-            } else {
-                outputTextArea.setText("Message sent");
-                if (clearAfterSendingCB.isSelected()) {
-                    textArea.setText("");
-                }
-            }
-        });
 
         buttonPanel.add(sendButton);
         buttonPanel.add(replyToMessageButton);
         buttonPanel.add(messageToReplyIdInput);
         bottomPanel.add(buttonPanel);
-
-        JPanel replyIdAndClearCheckbox = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-
-        replyIdAndClearCheckbox.add(clearAfterSendingCB);
-        bottomPanel.add(replyIdAndClearCheckbox);
-
-        add(bottomPanel, BorderLayout.SOUTH);
-
-        SwingUtilities.invokeLater(() -> {
-            String cutChatTitle = Strings.cutString(chatTitle, 50);
-            titleArea.setText("%s\n(ID:%d)".formatted(cutChatTitle, chatId));
-
-            loadScrollState(scrollPane, chatId, storage);
-        });
     }
 
     @Override
